@@ -36,6 +36,18 @@
 #include <linux/slab.h>
 #include <linux/sys_config.h>
 
+#include <linux/gpio.h>
+#define CONFIG_CPU_VOLTAGE_SCALING 1
+#define CPUXGPIOLABEL  "PL06"
+#define CPUXGPIO       358       //(ord('L')-ord('A'))*32+6
+#define regulator_set_voltage __r_set_volt
+static int __r_set_volt(void* r,u32 v1, u32 v2)
+{
+	gpio_set_value(CPUXGPIO,v1/1000==1300?1:0);
+	// pr_info("cpufreq vdd=%d gpio=%d\n",v1/1000,v1/1000==1300?1:0);
+	return 0; // 0 is success
+}
+
 enum {
 	DEBUG_NONE = 0,
 	DEBUG_FREQ = 1,
@@ -665,6 +677,9 @@ out_err_clk_pll:
 out_put_node:
 	of_node_put(np);
 
+	gpio_request(CPUXGPIO,CPUXGPIOLABEL);
+	gpio_direction_output(CPUXGPIO,1); //0=1.1v 1=1.3v
+	pr_info("dvfs_table: gpio%d %s set cpufreq voltage lv_volt\n",CPUXGPIO,CPUXGPIOLABEL);
 	return ret;
 }
 module_init(sunxi_cpufreq_initcall);
@@ -681,6 +696,7 @@ static void __exit sunxi_cpufreq_exitcall(void)
 	clk_put(sunxi_cpufreq.clk_pll);
 	clk_put(sunxi_cpufreq.clk_cpu);
 	cpufreq_unregister_driver(&sunxi_cpufreq_driver);
+	gpio_free(CPUXGPIO);
 }
 module_exit(sunxi_cpufreq_exitcall);
 
